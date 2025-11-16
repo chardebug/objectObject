@@ -3,6 +3,7 @@
 Event_info::Event_info()
 {
     title = "";
+    //Date = month/day/year
     date = 000000;
     start_time = "";
     end_time = "";
