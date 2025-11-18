@@ -5,16 +5,20 @@ using namespace std;
 class Event_info{
     public:
         Event_info();
-        Event_info(string t, int d, string start, string end, string l, string event_tag);
+        Event_info(string event_id, string t, string d, string start, string end, string l, string event_tag);
+        string get_id();
         string get_title();
-        int get_date();
+        string get_date();
         string get_start();
         string get_end();
         string get_location();
         string get_tag();
+        void print();
+        bool operator<(const Event_info& other) const;
     private:
+        string id;
         string title;
-        int date;
+        string date;
         string start_time;
         string end_time;
         string location;
