@@ -15,6 +15,8 @@ class Event_info{
         string get_tag();
         void print();
         bool operator<(const Event_info& other) const;
+        bool is_all_day() const;
+        string to_json() const;
     private:
         string id;
         string title;
