@@ -1,0 +1,871 @@
+<!-- DOCTYPE tells the browser this is an HTML5 document. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Character encoding so text displays correctly. -->
+  <meta charset="utf-8" />
+
+  <!-- Page title shown in the browser tab. -->
+  <title>Campus Calendar</title>
+
+  <!-- Makes the page scale properly on phones. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!--
+    FullCalendar provides its own CSS theme.
+    "index.global.min.css" gives the calendar its default styles.
+  -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css"
+    rel="stylesheet"
+  />
+
+  <!--
+    BEGINNING OF PAGE CSS
+    All of the styling below controls the dark theme, sidebar, calendar colors, etc.
+  -->
+  <style>
+
+    /*
+      CSS variables to reuse colors across the file.
+    */
+    :root {
+      --bg-page: #0f172a;           /* Dark page background */
+      --bg-card: #020617;           /* Card background */
+      --border-subtle: #1f2937;     /* Soft border color */
+      --text-main: #e5e7eb;         /* Main text color */
+      --text-muted: #9ca3af;        /* Dimmed text */
+      --today-bg: rgba(255, 255, 150, 0.16);   /* Highlight for today's date */
+      --today-border: rgba(255, 255, 200, 0.25);
+    }
+
+    /*
+      Body sets the entire page background and font.
+      The radial gradient for a dark fade.
+    */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(
+        circle at top,
+        #1f2937 0,
+        #020617 45%,
+        #020617 100%
+      );
+      color: var(--text-main);
+    }
+
+    /*
+      The main layout of the page uses CSS grid.
+      It creates two columns: the sidebar (left) and the calendar area (right).
+    */
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 16px;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    /*
+      FullCalendar's main table grid uses the class prefix ".fc".
+
+      NOTE: All FullCalendar classes begin with .fc
+      Examples:
+         .fc          -> the main calendar container
+         .fc-daygrid  -> month view grid
+         .fc-timegrid -> day/hour view
+         .fc-list     -> list view
+
+      Recolor borders so the grid matches the dark theme.
+    */
+    .fc-theme-standard td,
+    .fc-theme-standard th,
+    .fc-scrollgrid,
+    .fc-scrollgrid td,
+    .fc-scrollgrid th {
+      border-color: #1f2937 !important;
+    }
+
+    /*
+      SIDEBAR STYLES
+      The sidebar contains the tag filters.
+    */
+    .sidebar {
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      padding: 16px 18px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .sidebar h2 {
+      margin: 0 0 4px 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .sidebar small {
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: block;
+      font-size: 12px;
+    }
+
+    /* The top buttons: Check All + Clear All. */
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .filter-btn {
+      flex: 1;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: var(--text-muted);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .filter-btn:hover {
+      background: #111827;
+      color: var(--text-main);
+    }
+
+    /* Scrollable list of filter options. */
+    .filter-list {
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+    }
+
+    /* A single filter row: (checkbox + color dot + label). */
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 20px;
+      padding: 4px 2px;
+      cursor: pointer;
+    }
+
+    /* Checkbox in filter row. */
+    .filter-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+    }
+
+    /* Colored circle beside each tag. */
+    .filter-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex: 0 0 14px;
+      display: inline-block;
+    }
+
+    .filter-label {
+      flex: 1;
+      display: inline-block;
+      color: #c7ccd8;
+      font-size: 13px;
+    }
+
+    /* Individual tag swatch colors. */
+    .tag-default      { background: #474849; }
+    .tag-academy      { background: #8C6D57; }
+    .tag-activity     { background: #A4C54A; }
+    .tag-arts         { background: #AD5B8F; }
+    .tag-celebration  { background: #D5B60D; }
+    .tag-competition  { background: #F3953B; }
+    .tag-deadline     { background: #E85656; }
+    .tag-forum        { background: #F9A2BF; }
+    .tag-health       { background: #7BCF97; }
+    .tag-info         { background: #4B83C9; }
+    .tag-lecture      { background: #5fdaff; }
+    .tag-meeting      { background: #A083C6; }
+    .tag-training     { background: #589651; }
+
+    .filter-row:hover {
+      background: rgba(55, 65, 81, 0.35);
+    }
+
+    /*
+      MAIN CALENDAR WRAPPER on the right side.
+    */
+    .calendar-wrapper {
+      background: rgba(2, 6, 23, 0.96);
+      border-radius: 18px;
+      padding: 14px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    #calendar {
+      max-width: 1400px;
+      margin: auto;
+    }
+
+    /* .fc = FullCalendar container. Recolors the text. */
+    .fc {
+      color: var(--text-main);
+      font-size: 14px;
+    }
+
+    /* Header row (days of week). */
+    .fc-col-header,
+    .fc-col-header-cell,
+    .fc-scrollgrid-section-header {
+      background: #020617 !important;
+      color: var(--text-main) !important;
+      border-color: #1f2937 !important;
+    }
+
+    /* Month grid background. */
+    .fc-theme-standard .fc-scrollgrid {
+      background: #020617;
+      border-color: #1f2937;
+    }
+
+    /* Remove default event styling. */
+    .fc-daygrid-event,
+    .fc-timegrid-event {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Increase month cell height. */
+    .fc-daygrid-body tr {
+      height: 140px !important;
+    }
+
+    /* Today's date highlight. */
+    .fc-day-today {
+      background: var(--today-bg) !important;
+      border: 1px solid var(--today-border) !important;
+    }
+
+    /* Spacing for events in day view. */
+    .fc-timegrid-col .fc-timegrid-event-harness {
+      margin-bottom: 10px;
+    }
+
+    /*
+      EVENT CARDS inside month/day views.
+      Replace FullCalendar's default event appearance.
+    */
+    .event-card {
+      border-radius: 10px;
+      padding: 4px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+      width: 100%;
+      overflow: hidden;
+      white-space: normal;
+    }
+
+    .event-time {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .event-title {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .event-tag {
+      width: 100%;
+      margin-top: 2px;
+      padding: 2px 8px;
+      text-align: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 10px;
+      color: #d3d9e6;
+    }
+
+    /* Colored top border for cards. */
+    .tag-default      { border-top: 3px solid #474849 !important; }
+    .tag-academy      { border-top: 3px solid #8C6D57 !important; }
+    .tag-activity     { border-top: 3px solid #A4C54A !important; }
+    .tag-arts         { border-top: 3px solid #AD5B8F !important; }
+    .tag-celebration  { border-top: 3px solid #D5B60D !important; }
+    .tag-competition  { border-top: 3px solid #F3953B !important; }
+    .tag-deadline     { border-top: 3px solid #E85656 !important; }
+    .tag-forum        { border-top: 3px solid #F9A2BF !important; }
+    .tag-health       { border-top: 3px solid #7BCF97 !important; }
+    .tag-info         { border-top: 3px solid #4B83C9 !important; }
+    .tag-lecture      { border-top: 3px solid #5fdaff !important; }
+    .tag-meeting      { border-top: 3px solid #A083C6 !important; }
+    .tag-training     { border-top: 3px solid #589651 !important; }
+
+    /* Special red background for deadlines. */
+    .event-card.tag-deadline {
+      background: rgba(255, 100, 100, 0.16);
+    }
+
+    /*
+      LIST VIEW STYLES
+      When FullCalendar displays events as a list.
+    */
+    .fc-list-table {
+      background: #020617 !important;
+      border-color: #1f2937 !important;
+    }
+
+    .fc-list {
+      border-color: #1f2937 !important;
+      background: #020617 !important;
+    }
+
+    .fc-list-table tr,
+    .fc-list-table td,
+    .fc-list-table {
+      border-color: #1f2937 !important;
+    }
+
+    .fc-list-day,
+    .fc-list-day > td,
+    .fc-list-day-side,
+    .fc-list-day-text {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-color: #1f2937 !important;
+    }
+
+    .fc-list-day-cushion {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-color: #1f2937 !important;
+      text-align: left !important;
+      font-weight: 600 !important;
+      font-size: 14px !important;
+      padding: 8px 10px !important;
+      text-transform: none !important;
+    }
+
+    .fc-list-event-dot {
+      display: none !important;
+    }
+
+    .fc-list-event:hover td,
+    .fc-list-event:hover {
+      background: transparent !important;
+      color: var(--text-main) !important;
+    }
+
+    .list-row {
+      padding: 6px 0;
+    }
+
+    .list-card {
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .list-card.tag-deadline {
+      background: rgba(255, 100, 100, 0.16);
+      border-top: 4px solid #ff7a7a;
+    }
+
+    .list-time {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .list-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .list-tag {
+      width: fit-content;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 10px;
+      color: #d3d9e6;
+      margin-top: 4px;
+    }
+
+    /*
+      EVENT DETAILS POPUP MODAL
+      Appears when the user clicks an event.
+    */
+    #eventModal {
+      display: none;              /* Hidden until opened. */
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-box {
+      width: min(420px, 92%);
+      background: #020617;
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      font-size: 13px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #4ade80;
+      color: #4ade80;
+    }
+
+    .btn-outline:hover {
+      background: rgba(74, 222, 128, 0.15);
+    }
+
+    .btn-primary {
+      background: #4ade80;
+      border: 1px solid #4ade80;
+      color: #020617;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: #22c55e;
+      border-color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+
+  <!--
+    MAIN LAYOUT: Left (sidebar) + Right (calendar).
+  -->
+  <div class="layout">
+
+    <!-- SIDEBAR: Contains tag filter checkboxes. -->
+    <aside class="sidebar">
+      <h2>Tag Filters</h2>
+
+      <!-- Buttons to check all or uncheck all filters. -->
+      <div class="filter-actions">
+        <button type="button" id="btnCheckAll" class="filter-btn">Check all</button>
+        <button type="button" id="btnClearAll" class="filter-btn">Clear all</button>
+      </div>
+
+      <!-- Scrollable list of tag filters. -->
+      <div class="filter-list">
+        <!-- Each filter row contains: checkbox + color swatch + label. -->
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Standard" checked />
+          <span class="filter-swatch tag-default"></span>
+          <span class="filter-label">Standard</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Academy/Convention" checked />
+          <span class="filter-swatch tag-academy"></span>
+          <span class="filter-label">Academy/Convention</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Activity" checked />
+          <span class="filter-swatch tag-activity"></span>
+          <span class="filter-label">Activity</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Arts & Entertainment" checked />
+          <span class="filter-swatch tag-arts"></span>
+          <span class="filter-label">Arts & Entertainment</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Celebration/Ceremony" checked />
+          <span class="filter-swatch tag-celebration"></span>
+          <span class="filter-label">Celebration/Ceremony</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Competition/Tournament" checked />
+          <span class="filter-swatch tag-competition"></span>
+          <span class="filter-label">Competition/Tournament</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Deadline/Important Date" checked />
+          <span class="filter-swatch tag-deadline"></span>
+          <span class="filter-label">Deadline/Important Date</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Forum" checked />
+          <span class="filter-swatch tag-forum"></span>
+          <span class="filter-label">Forum</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Health & Wellness" checked />
+          <span class="filter-swatch tag-health"></span>
+          <span class="filter-label">Health & Wellness</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Information Display or Fair" checked />
+          <span class="filter-swatch tag-info"></span>
+          <span class="filter-label">Information Display or Fair</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Lecture/Seminar" checked />
+          <span class="filter-swatch tag-lecture"></span>
+          <span class="filter-label">Lecture/Seminar</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Meeting" checked />
+          <span class="filter-swatch tag-meeting"></span>
+          <span class="filter-label">Meeting</span>
+        </label>
+
+        <label class="filter-row">
+          <input type="checkbox" data-tag="Training/Workshop" checked />
+          <span class="filter-swatch tag-training"></span>
+          <span class="filter-label">Training/Workshop</span>
+        </label>
+      </div>
+    </aside>
+
+    <!-- RIGHT SIDE: Calendar renders here. -->
+    <main class="calendar-wrapper">
+      <div id="calendar"></div>
+    </main>
+  </div>
+
+  <!--
+    EVENT DETAILS MODAL (POPUP)
+    Hidden until an event is clicked.
+  -->
+  <div id="eventModal">
+    <div class="modal-box">
+      <h2 id="modalTitle"></h2>
+      <p><strong>Date:</strong> <span id="modalDate"></span></p>
+      <p><strong>Time:</strong> <span id="modalTime"></span></p>
+      <p><strong>Location:</strong> <span id="modalLocation"></span></p>
+      <p><strong>Tag:</strong> <span id="modalTag"></span></p>
+
+      <div class="modal-buttons">
+        <!-- Button closes the modal. -->
+        <button class="btn btn-outline" onclick="closeModal()">Close</button>
+
+        <!-- Button opens Google Maps for event location -->
+        <button class="btn btn-primary" onclick="openMap()">Open in Google Maps</button>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    FULLCALENDAR SCRIPTS
+    Scripts load FullCalendar's functionality.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/list.global.min.js"></script>
+
+  <!--
+    MAIN JAVASCRIPT CONTROLLING THE CALENDAR
+  -->
+  <script>
+    /* Stores last-clicked event location. */
+    let currentLocation = "";
+
+    /* Set of tags that are currently allowed (checked). */
+    let activeTags = new Set();
+
+    /* Will store the FullCalendar instance. */
+    let calendar;
+
+    /* Hides the event modal */
+    function closeModal() {
+      document.getElementById("eventModal").style.display = "none";
+    }
+
+    /* Opens Google Maps if event has a valid location. */
+    function openMap() {
+      if (!currentLocation) return;
+
+      // Block "Online" or "N/A" locations.
+      if (currentLocation.toLowerCase().includes("online")) return;
+      if (currentLocation === "N/A") return;
+
+      // Open Google Maps with the encoded location.
+      window.open(
+        "https://www.google.com/maps/search/?api=1&query=" +
+          encodeURIComponent(currentLocation),
+        "_blank"
+      );
+    }
+
+    /* Reads which checkboxes are checked and updates the activeTags set. */
+    function readActiveTags() {
+      activeTags.clear();
+      document
+        .querySelectorAll(".filter-row input[type='checkbox']")
+        .forEach(cb => {
+          if (cb.checked) activeTags.add(cb.dataset.tag);
+        });
+    }
+
+    /* Converts a JS Date object into a short 12‑hour time like 3:45p. */
+    function formatTimeShort(dateObj) {
+      if (!dateObj) return "";
+      let hour = dateObj.getHours();
+      let minute = dateObj.getMinutes();
+      const suffix = hour >= 12 ? "p" : "a";
+      hour = hour % 12;
+      if (hour === 0) hour = 12;
+      return `${hour}:${minute.toString().padStart(2, "0")}${suffix}`;
+    }
+
+    /* Creates a readable start–end time range. */
+    function buildTimeRange(event) {
+      if (event.allDay) return "All day";
+      if (!event.end) return formatTimeShort(event.start);
+      return `${formatTimeShort(event.start)}–${formatTimeShort(event.end)}`;
+    }
+
+    /*
+      Matches event tags to their CSS class.
+      If unknown, fall back to "tag-default".
+    */
+    function getTagClass(tag) {
+      return (
+        {
+          "Deadline/Important Date": "tag-deadline",
+          Activity: "tag-activity",
+          "Arts & Entertainment": "tag-arts",
+          Meeting: "tag-meeting",
+          "Lecture/Seminar": "tag-lecture",
+          "Health & Wellness": "tag-health",
+          "Training/Workshop": "tag-training",
+          "Competition/Tournament": "tag-competition",
+          Forum: "tag-forum",
+          "Information Display or Fair": "tag-info",
+          "Celebration/Ceremony": "tag-celebration",
+          "Academy/Convention": "tag-academy"
+        }[tag] || "tag-default"
+      );
+    }
+
+    /*
+      When the page finishes loading, sets up the FullCalendar instance
+      and attaches all event handlers.
+    */
+    document.addEventListener("DOMContentLoaded", () => {
+
+      /* Load initial checked tags. */
+      readActiveTags();
+
+      /* Reference to the calendar <div>. */
+      const calendarEl = document.getElementById("calendar");
+
+      /*
+        Create FullCalendar instance.
+        FullCalendar.Calendar takes two arguments:
+          1. The element to draw into.
+          2. A configuration object.
+      */
+      calendar = new FullCalendar.Calendar(calendarEl, {
+
+        /* Start in month view. */
+        initialView: "dayGridMonth",
+        height: "auto",
+
+        /* Prevent overlapping event boxes. */
+        slotEventOverlap: false,
+        eventoverlap: false,
+        eventMinHeight: 22,
+
+        /* Calendar header bar buttons. */
+        headerToolbar: {
+          left: "prev,next,today",
+          center: "title",
+          right: "dayGridMonth,listWeek,timeGridDay"
+        },
+
+        /* Custom text for the buttons. */
+        buttonText: {
+          dayGridMonth: "month",
+          listWeek: "week",
+          timeGridDay: "day"
+        },
+
+        /*
+          EVENTS SOURCE FUNCTION
+          FullCalendar calls this whenever it needs event data.
+        */
+        events: (fetchInfo, success, fail) => {
+          fetch("/events.json")
+            .then(r => r.json())
+            .then(data => {
+              /* Apply tag filtering. */
+              success(data.filter(ev => activeTags.has(ev.tag)));
+            })
+            .catch(fail);
+        },
+
+        /*
+          eventContent overrides how events visually appear
+          (both in month view and list/week/day views).
+        */
+        eventContent: arg => {
+          const ev = arg.event;
+
+          /* LIST WEEK or DAY VIEW */
+          if (arg.view.type === "listWeek" || arg.view.type === "timeGridDay") {
+            const tag = ev.extendedProps.tag || "Standard";
+            const tagClass = getTagClass(tag);
+            const timeText = buildTimeRange(ev);
+
+            return {
+              html: `
+                <div class="list-row">
+                  <div class="list-card ${tagClass}">
+                    <div class="list-time">${timeText}</div>
+                    <div class="list-title">${ev.title}</div>
+                    <div class="list-tag">${tag}</div>
+                  </div>
+                </div>
+              `
+            };
+          }
+
+          /* MONTH VIEW EVENT CARD */
+          const card = document.createElement("div");
+          card.className = "event-card " + getTagClass(ev.extendedProps.tag);
+
+          card.innerHTML = `
+            <div class="event-time">${buildTimeRange(ev)}</div>
+            <div class="event-title">${ev.title}</div>
+            <div class="event-tag">${ev.extendedProps.tag || ""}</div>
+          `;
+
+          return { domNodes: [card] };
+        },
+
+        /*
+          When the user clicks an event, open the modal.
+        */
+        eventClick: info => {
+          const ev = info.event;
+
+          document.getElementById("modalTitle").innerText = ev.title;
+
+          document.getElementById("modalDate").innerText =
+            ev.start.toLocaleDateString([], {
+              month: "short",
+              day: "numeric",
+              year: "numeric"
+            });
+
+          document.getElementById("modalTime").innerText = buildTimeRange(ev);
+
+          /* Save the event's location. */
+          currentLocation = ev.extendedProps.location || "N/A";
+          document.getElementById("modalLocation").innerText = currentLocation;
+
+          /* Hide Google Maps button if no location. */
+          const mapBtn = document.querySelector(".btn.btn-primary");
+          if (!currentLocation ||
+              currentLocation === "N/A" ||
+              currentLocation.toLowerCase().includes("online")) {
+            mapBtn.style.display = "none";
+          } else {
+            mapBtn.style.display = "inline-block";
+          }
+
+          document.getElementById("modalTag").innerText =
+            ev.extendedProps.tag || "";
+
+          document.getElementById("eventModal").style.display = "flex";
+        }
+      });
+
+      /* Render the calendar to the screen. */
+      calendar.render();
+
+      /* When any filter checkbox changes, update the events. */
+      document
+        .querySelectorAll(".filter-row input[type='checkbox']")
+        .forEach(cb => {
+          cb.addEventListener("change", () => {
+            readActiveTags();
+            calendar.refetchEvents();
+          });
+        });
+
+      /* CHECK ALL BUTTON */
+      document.getElementById("btnCheckAll").addEventListener("click", () => {
+        document
+          .querySelectorAll(".filter-row input[type='checkbox']")
+          .forEach(cb => (cb.checked = true));
+
+        readActiveTags();
+        calendar.refetchEvents();
+      });
+
+      /* CLEAR ALL BUTTON */
+      document.getElementById("btnClearAll").addEventListener("click", () => {
+        document
+          .querySelectorAll(".filter-row input[type='checkbox']")
+          .forEach(cb => (cb.checked = false));
+
+        readActiveTags();
+        calendar.refetchEvents();
+      });
+
+      /* Close modal on ESC key. */
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") closeModal();
+      });
+
+      /* Close modal by clicking the background. */
+      document.getElementById("eventModal").addEventListener("click", e => {
+        if (e.target.id === "eventModal") closeModal();
+      });
+    });
+  </script>
+</body>
+</html>
