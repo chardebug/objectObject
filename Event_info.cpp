@@ -14,17 +14,20 @@ Event_info::Event_info()
     end_time = "";
     location = "";
     tag = "";
+    end_date = ""; 
 }
 
-Event_info::Event_info(string event_id, string t, string d, string start, string end, string l, string event_tag)
+Event_info::Event_info(string event_id, string t, string d, string start, string endDate, string end, string l, string event_tag)
 {
     id = event_id;
     title = t;
     date = d;
     start_time = start;
+    end_date = endDate;
     end_time = end;
     location = l;
     tag = event_tag;
+    
 }
 
 string Event_info::get_id()
@@ -52,6 +55,11 @@ string Event_info::get_end()
     return end_time;
 }
 
+string Event_info::get_end_date()
+{
+    return end_date;
+}
+
 string Event_info::get_location()
 {
     return location;
@@ -64,7 +72,7 @@ string Event_info::get_tag()
 
 void Event_info::print()
 {
-    cout << id << " " << title << " " << date << " " << start_time << " " << end_time << " " << location << " " << tag << endl;
+    cout << id << " " << title << " " << date << " " << start_time << " " << end_date << " " << end_time << " " << location << " "<< tag << endl;
     return;
 }
 
@@ -110,6 +118,7 @@ static string convert_to_iso(const string& mmddyy, const string& time) {
 
     return out.str();  //Example: "2025-10-02T15:30:00"
 }
+
 //Makes string safe for JSON by escaping quotes and backslashes
 static string escape_json(const string& s) {
     string out = "";
@@ -127,19 +136,18 @@ static string escape_json(const string& s) {
 //JSON output
 string Event_info::to_json() const {
     string iso_start = convert_to_iso(date, start_time);
-    string iso_end = convert_to_iso(date, end_time);
+    string iso_end = convert_to_iso(end_date, end_time);
 
     string json = "{ ";
     json += "\"id\": \"" + escape_json(id) + "\", ";
     json += "\"title\": \"" + escape_json(title) + "\", ";
+    json += "\"start\": \"" + iso_start + "\", ";
+    json += "\"end\": \"" + iso_end + "\", ";
 
     if (is_all_day()) {
-        json += "\"start\": \"" + iso_start + "\", ";
         json += "\"allDay\": true, ";
     }
     else {
-        json += "\"start\": \"" + iso_start + "\", ";
-        json += "\"end\": \"" + iso_end + "\", ";
         json += "\"allDay\": false, ";
     }
 
@@ -149,7 +157,6 @@ string Event_info::to_json() const {
         json += "\"location\": \"" + escape_json(location) + "\", ";
 
     json += "\"tag\": \"" + escape_json(tag) + "\" }";
-
     return json;
 }
 
