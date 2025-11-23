@@ -1,15 +1,3 @@
-/*
-    FIX EXPLANATION:
-
-      - Reset "count" for every new event so every line starts at field #1 again.
-      - Trim whitespace so fields are clean.
-      - Extract the date using known fixed positions (MM/DD/YYYY is always 10 chars).
-      - Extract the time by checking if there is anything AFTER the date,
-        instead of assuming an exact character location.
-
-    Result: fields no longer bleed into each other, dates/times parse correctly,
-            and the JSON output becomes normalized.
-*/
 
 #include <fstream> 
 #include <iostream> 
@@ -42,6 +30,7 @@ int main() {
     string date;
     string start_time;
     string end_time;
+    string end_date;
     string tag;
     int count = 0;
     string id;
@@ -69,12 +58,11 @@ int main() {
             if (count == 1) {
                 title = segment;
             }
-            //Date + Start time
+            //Start date + start time
             else if (count == 2) {
-                // Parse date + optional time: 
-                // First 10 chars = MM/DD/YYYY
-                // Anything after that = start time
-                // If only the date is present, then all-day event
+                //First 10 chars = MM/DD/YYYY
+                //Anything after that = start time
+                //If only the date is present, then all-day event
                 if (segment.length() >= 10) {
                     string MM = segment.substr(0, 2);
                     string DD = segment.substr(3, 2);
@@ -85,7 +73,7 @@ int main() {
                     date = "000000";
                 }
                 
-                // If over 10 char date, then start time
+                //If over 10 char date, then start time
                 if (segment.length() > 10) {
                     start_time = trim(segment.substr(10));
                 }
@@ -93,13 +81,21 @@ int main() {
                     start_time = "N/A";
                 }
             }
-
-            //End time
-            // Parse date + optional time
-            // Same format as start time
-            // If text exists after 10-char date, then it is the end time
-            // Otherwise, it's an all-day event
+            //End date + end time
+            //Same format as start field
+            //Fixed logic because forgot to handle multi-day events
             else if (count == 3) {
+                if (segment.length() >= 10) {
+                    string MM = segment.substr(0, 2);
+                    string DD = segment.substr(3, 2);
+                    string YY = segment.substr(8, 2);
+                    end_date = MM + DD + YY;
+                }
+                else {
+                    end_date = date;  //Default same day
+                }
+
+                //Extract end time if present
                 if (segment.length() > 10) {
                     end_time = trim(segment.substr(10));
                 }
@@ -113,10 +109,12 @@ int main() {
                 location = segment;
                 if (location == "") location = "N/A";
             }
+
             //Tag
             else {
                 tag = segment;
             }
+
             //Add to map and reset variables for next line
             if (count == 5) {
                 id = date + '0';
@@ -125,11 +123,12 @@ int main() {
                     id_count++;
                     id = date + to_string(id_count);
                 }
-                event_map[id] = new Event_info(id, title, date, start_time, end_time, location, tag);
+                event_map[id] = new Event_info(id, title, date, start_time, end_date, end_time, location, tag);
                 //Reset variables
                 title = "";
                 date = "";
                 start_time = "";
+                end_date = "";
                 end_time = "";
                 count = 0;
                 id = "";
