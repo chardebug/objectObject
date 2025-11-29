@@ -113,11 +113,55 @@
       font-size: 12px;
     }
 
+    /* Search box in sidebar to find events by keyword. */
+    .search-label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: var(--text-main);
+      font-size: 12px;
+      margin-bottom: 6px;
+      box-sizing: border-box;
+    }
+
+    .search-input::placeholder {
+      color: #6b7280;
+    }
+
+    /* Favorites-only toggle under search. */
+    .favorite-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      margin-top: 2px;
+    }
+
+    .favorite-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+    }
+
     /* The top buttons: Check All + Clear All. */
     .filter-actions {
       display: flex;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 25px;
     }
 
     .filter-btn {
@@ -138,7 +182,7 @@
 
     /* Scrollable list of filter options. */
     .filter-list {
-      max-height: calc(100vh - 160px);
+      max-height: calc(100vh - 200px);
       overflow-y: auto;
     }
 
@@ -272,6 +316,13 @@
       white-space: normal;
     }
 
+    .event-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+    }
+
     .event-time {
       font-size: 11px;
       font-weight: 600;
@@ -293,6 +344,23 @@
       border: 1px solid rgba(255, 255, 255, 0.15);
       font-size: 10px;
       color: #d3d9e6;
+    }
+
+    /* Favorites star button (month/day + list views). */
+    .fav-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      margin-left: 4px;
+      color: #6b7280;
+    }
+
+    .fav-btn.fav-on {
+      color: #facc15;
+      text-shadow: 0 0 6px rgba(250, 204, 21, 0.7);
     }
 
     /* Colored top border for cards. */
@@ -384,6 +452,13 @@
       border-top: 4px solid #ff7a7a;
     }
 
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
     .list-time {
       font-size: 11px;
       font-weight: 600;
@@ -422,7 +497,7 @@
     }
 
     .modal-box {
-      width: min(420px, 92%);
+      width: min(460px, 92%);
       background: #020617;
       border-radius: 16px;
       padding: 20px;
@@ -435,6 +510,7 @@
       justify-content: flex-end;
       gap: 10px;
       margin-top: 18px;
+      flex-wrap: wrap;
     }
 
     .btn {
@@ -478,6 +554,20 @@
     <!-- SIDEBAR: Contains tag filter checkboxes. -->
     <aside class="sidebar">
       <h2>Tag Filters</h2>
+
+      <!-- Search box to find events by keyword. -->
+      <input
+        type="text"
+        id="eventSearch"
+        class="search-input"
+        placeholder="Search by title, location, or tag"
+      />
+
+      <!-- Favorites-only toggle. -->
+      <label class="favorite-toggle">
+        <input type="checkbox" id="favOnlyToggle" />
+        <span>Show favorites only</span>
+      </label>
 
       <!-- Buttons to check all or uncheck all filters. -->
       <div class="filter-actions">
@@ -591,8 +681,15 @@
         <!-- Button closes the modal. -->
         <button class="btn btn-outline" onclick="closeModal()">Close</button>
 
+        <!-- Button downloads ICS file for this event. -->
+        <button class="btn btn-primary" id="addToCalendarBtn" onclick="downloadIcs()">
+          Add to my Calendar (.ics)
+        </button>
+
         <!-- Button opens Google Maps for event location -->
-        <button class="btn btn-primary" onclick="openMap()">Open in Google Maps</button>
+        <button class="btn btn-primary" id="mapButton" onclick="openMap()">
+          Open in Google Maps
+        </button>
       </div>
     </div>
   </div>
@@ -611,8 +708,20 @@
     /* Stores last-clicked event location. */
     let currentLocation = "";
 
+    /* Stores the last-clicked FullCalendar event object (for ICS). */
+    let lastClickedEvent = null;
+
     /* Set of tags that are currently allowed (checked). */
     let activeTags = new Set();
+
+    /* Search query from sidebar search box. */
+    let searchQuery = "";
+
+    /* Whether to show only favorite events. */
+    let showFavoritesOnly = false;
+
+    /* Favorite event IDs, persisted in localStorage. */
+    let favoriteIds = new Set();
 
     /* Will store the FullCalendar instance. */
     let calendar;
@@ -648,7 +757,40 @@
         });
     }
 
-    /* Converts a JS Date object into a short 12‑hour time like 3:45p. */
+    /* Load favorites from localStorage into favoriteIds set. */
+    function loadFavorites() {
+      try {
+        const raw = localStorage.getItem("favoriteEvents");
+        if (raw) {
+          const arr = JSON.parse(raw);
+          favoriteIds = new Set(arr);
+        }
+      } catch (e) {
+        favoriteIds = new Set();
+      }
+    }
+
+    /* Save favorites from favoriteIds set into localStorage. */
+    function saveFavorites() {
+      try {
+        const arr = Array.from(favoriteIds);
+        localStorage.setItem("favoriteEvents", JSON.stringify(arr));
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    /* Toggle favorite status for a given event ID. */
+    function toggleFavorite(eventId) {
+      if (favoriteIds.has(eventId)) {
+        favoriteIds.delete(eventId);
+      } else {
+        favoriteIds.add(eventId);
+      }
+      saveFavorites();
+    }
+
+    /* Converts a JS Date object into a short 12-hour time like 3:45p. */
     function formatTimeShort(dateObj) {
       if (!dateObj) return "";
       let hour = dateObj.getHours();
@@ -689,13 +831,88 @@
       );
     }
 
+    /* Helper to pad numbers for ICS date format. */
+    function pad2(n) {
+      return n.toString().padStart(2, "0");
+    }
+
+    /* Format JS Date object into YYYYMMDDTHHMMSS for ICS. */
+    function formatDateForICS(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = pad2(dateObj.getMonth() + 1);
+      const day = pad2(dateObj.getDate());
+      const hour = pad2(dateObj.getHours());
+      const minute = pad2(dateObj.getMinutes());
+      const second = pad2(dateObj.getSeconds());
+      return `${year}${month}${day}T${hour}${minute}${second}`;
+    }
+
+    /* Create and download a single-event ICS file for lastClickedEvent. */
+    function downloadIcs() {
+      if (!lastClickedEvent) return;
+      const ev = lastClickedEvent;
+
+      let dtStart, dtEnd;
+
+      if (ev.allDay) {
+        // For all-day: use YYYYMMDDT000000, based on startStr/endStr if available
+        const startStr = ev.startStr.replace(/[-:]/g, "").replace(/Z$/, "");
+        dtStart = startStr.length >= 8 ? startStr.slice(0, 8) + "T000000" : "";
+        if (ev.endStr) {
+          const endStr = ev.endStr.replace(/[-:]/g, "").replace(/Z$/, "");
+          dtEnd = endStr.length >= 8 ? endStr.slice(0, 8) + "T000000" : dtStart;
+        } else {
+          dtEnd = dtStart;
+        }
+      } else {
+        // Timed event: use local Date objects
+        dtStart = formatDateForICS(ev.start);
+        dtEnd = ev.end ? formatDateForICS(ev.end) : dtStart;
+      }
+
+      const uid = ev.id || (Date.now() + "@campus-calendar");
+
+      const lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Campus Calendar//EN",
+        "BEGIN:VEVENT",
+        "UID:" + uid,
+        "SUMMARY:" + (ev.title || "").replace(/[\r\n]/g, " "),
+        "DTSTART:" + dtStart,
+        "DTEND:" + dtEnd
+      ];
+
+      if (ev.extendedProps.location) {
+        lines.push(
+          "LOCATION:" + ev.extendedProps.location.replace(/[\r\n]/g, " ")
+        );
+      }
+
+      lines.push("END:VEVENT", "END:VCALENDAR");
+
+      const blob = new Blob([lines.join("\r\n")], {
+        type: "text/calendar;charset=utf-8"
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (ev.title || "event") + ".ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
     /*
       When the page finishes loading, sets up the FullCalendar instance
       and attaches all event handlers.
     */
     document.addEventListener("DOMContentLoaded", () => {
 
-      /* Load initial checked tags. */
+      /* Load favorites from localStorage and initial checked tags. */
+      loadFavorites();
       readActiveTags();
 
       /* Reference to the calendar <div>. */
@@ -715,7 +932,6 @@
 
         /* Prevent overlapping event boxes. */
         slotEventOverlap: false,
-        eventoverlap: false,
         eventMinHeight: 22,
 
         /* Calendar header bar buttons. */
@@ -740,8 +956,29 @@
           fetch("/events.json")
             .then(r => r.json())
             .then(data => {
-              /* Apply tag filtering. */
-              success(data.filter(ev => activeTags.has(ev.tag)));
+              const q = searchQuery.trim().toLowerCase();
+
+              const filtered = data.filter(ev => {
+                // Tag filter
+                if (!activeTags.has(ev.tag)) return false;
+
+                // Favorites-only filter
+                if (showFavoritesOnly && !favoriteIds.has(ev.id)) return false;
+
+                // Keyword search on title + location + tag
+                if (!q) return true;
+                const haystack = [
+                  ev.title || "",
+                  ev.location || "",
+                  ev.tag || ""
+                ]
+                  .join(" ")
+                  .toLowerCase();
+
+                return haystack.includes(q);
+              });
+
+              success(filtered);
             })
             .catch(fail);
         },
@@ -752,35 +989,103 @@
         */
         eventContent: arg => {
           const ev = arg.event;
+          const tag = ev.extendedProps.tag || "Standard";
+          const tagClass = getTagClass(tag);
+          const timeText = buildTimeRange(ev);
+          const isFav = favoriteIds.has(ev.id);
 
           /* LIST WEEK or DAY VIEW */
           if (arg.view.type === "listWeek" || arg.view.type === "timeGridDay") {
-            const tag = ev.extendedProps.tag || "Standard";
-            const tagClass = getTagClass(tag);
-            const timeText = buildTimeRange(ev);
+            const container = document.createElement("div");
+            container.className = "list-row";
 
-            return {
-              html: `
-                <div class="list-row">
-                  <div class="list-card ${tagClass}">
-                    <div class="list-time">${timeText}</div>
-                    <div class="list-title">${ev.title}</div>
-                    <div class="list-tag">${tag}</div>
-                  </div>
-                </div>
-              `
-            };
+            const card = document.createElement("div");
+            card.className = "list-card " + tagClass;
+            container.appendChild(card);
+
+            const header = document.createElement("div");
+            header.className = "list-header";
+
+            const textBox = document.createElement("div");
+            const timeDiv = document.createElement("div");
+            timeDiv.className = "list-time";
+            timeDiv.textContent = timeText;
+            const titleDiv = document.createElement("div");
+            titleDiv.className = "list-title";
+            titleDiv.textContent = ev.title;
+
+            textBox.appendChild(timeDiv);
+            textBox.appendChild(titleDiv);
+
+            const favBtn = document.createElement("button");
+            favBtn.className = "fav-btn" + (isFav ? " fav-on" : "");
+            favBtn.type = "button";
+            favBtn.setAttribute("aria-label", "Toggle favorite");
+            favBtn.textContent = isFav ? "★" : "☆";
+
+            favBtn.addEventListener("click", e => {
+              e.stopPropagation();
+              toggleFavorite(ev.id);
+              const nowFav = favoriteIds.has(ev.id);
+              favBtn.textContent = nowFav ? "★" : "☆";
+              if (nowFav) favBtn.classList.add("fav-on");
+              else favBtn.classList.remove("fav-on");
+              if (showFavoritesOnly) calendar.refetchEvents();
+            });
+
+            header.appendChild(textBox);
+            header.appendChild(favBtn);
+            card.appendChild(header);
+
+            const tagDiv = document.createElement("div");
+            tagDiv.className = "list-tag";
+            tagDiv.textContent = tag;
+            card.appendChild(tagDiv);
+
+            return { domNodes: [container] };
           }
 
           /* MONTH VIEW EVENT CARD */
           const card = document.createElement("div");
-          card.className = "event-card " + getTagClass(ev.extendedProps.tag);
+          card.className = "event-card " + tagClass;
 
-          card.innerHTML = `
-            <div class="event-time">${buildTimeRange(ev)}</div>
-            <div class="event-title">${ev.title}</div>
-            <div class="event-tag">${ev.extendedProps.tag || ""}</div>
-          `;
+          const topRow = document.createElement("div");
+          topRow.className = "event-top-row";
+
+          const timeDiv = document.createElement("div");
+          timeDiv.className = "event-time";
+          timeDiv.textContent = timeText;
+
+          const favBtn = document.createElement("button");
+          favBtn.className = "fav-btn" + (isFav ? " fav-on" : "");
+          favBtn.type = "button";
+          favBtn.setAttribute("aria-label", "Toggle favorite");
+          favBtn.textContent = isFav ? "★" : "☆";
+
+          favBtn.addEventListener("click", e => {
+            e.stopPropagation();
+            toggleFavorite(ev.id);
+            const nowFav = favoriteIds.has(ev.id);
+            favBtn.textContent = nowFav ? "★" : "☆";
+            if (nowFav) favBtn.classList.add("fav-on");
+            else favBtn.classList.remove("fav-on");
+            if (showFavoritesOnly) calendar.refetchEvents();
+          });
+
+          topRow.appendChild(timeDiv);
+          topRow.appendChild(favBtn);
+
+          const titleDiv = document.createElement("div");
+          titleDiv.className = "event-title";
+          titleDiv.textContent = ev.title;
+
+          const tagDiv = document.createElement("div");
+          tagDiv.className = "event-tag";
+          tagDiv.textContent = tag;
+
+          card.appendChild(topRow);
+          card.appendChild(titleDiv);
+          card.appendChild(tagDiv);
 
           return { domNodes: [card] };
         },
@@ -790,6 +1095,7 @@
         */
         eventClick: info => {
           const ev = info.event;
+          lastClickedEvent = ev; // store for ICS download
 
           document.getElementById("modalTitle").innerText = ev.title;
 
@@ -806,15 +1112,21 @@
           currentLocation = ev.extendedProps.location || "N/A";
           document.getElementById("modalLocation").innerText = currentLocation;
 
-          /* Hide Google Maps button if no location. */
-          const mapBtn = document.querySelector(".btn.btn-primary");
-          if (!currentLocation ||
-              currentLocation === "N/A" ||
-              currentLocation.toLowerCase().includes("online")) {
+          /* Handle map button visibility based on location. */
+          const mapBtn = document.getElementById("mapButton");
+          if (
+            !currentLocation ||
+            currentLocation === "N/A" ||
+            currentLocation.toLowerCase().includes("online")
+          ) {
             mapBtn.style.display = "none";
           } else {
             mapBtn.style.display = "inline-block";
           }
+
+          /* Add-to-calendar button is always available. */
+          const icsBtn = document.getElementById("addToCalendarBtn");
+          icsBtn.style.display = "inline-block";
 
           document.getElementById("modalTag").innerText =
             ev.extendedProps.tag || "";
@@ -855,6 +1167,22 @@
         readActiveTags();
         calendar.refetchEvents();
       });
+
+      /* Search input listener (filters by keyword). */
+      document
+        .getElementById("eventSearch")
+        .addEventListener("input", e => {
+          searchQuery = e.target.value || "";
+          calendar.refetchEvents();
+        });
+
+      /* Favorites-only toggle. */
+      document
+        .getElementById("favOnlyToggle")
+        .addEventListener("change", e => {
+          showFavoritesOnly = e.target.checked;
+          calendar.refetchEvents();
+        });
 
       /* Close modal on ESC key. */
       document.addEventListener("keydown", e => {
